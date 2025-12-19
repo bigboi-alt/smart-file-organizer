@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Krishi Salahkar</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', 
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        'primary': '#ea580c',
+                        'secondary': '#f97316',
+                        'dark-bg': '#0f172a', 
+                        'dark-surface': '#1e293b', 
+                        'chat-bg': '#fff7ed',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { transition: background-color 0.3s, color 0.3s; }
+        #chat-window { height: 60vh; overflow-y: auto; scroll-behavior: smooth; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        
+        .modal-overlay { 
+            background-color: rgba(0, 0, 0, 0.6); 
+            backdrop-filter: blur(8px); 
+        }
+        
+        .user-message { background-color: #ffedd5; align-self: flex-end; border-radius: 12px 12px 0 12px; }
+        .dark .user-message { background-color: #7c2d12; color: #ffedd5; }
+        .ai-message { background-color: white; align-self: flex-start; border-radius: 12px 12px 12px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .dark .ai-message { background-color: #334155; color: #f1f5f9; }
+
+        .bg-pattern-light {
+            background-color: #fff7ed; 
+            background-image: radial-gradient(#fb923c 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .dark .bg-pattern-light {
+            background-color: #0f172a; 
+            background-image: radial-gradient(#334155 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+    </style>
+</head>
+<body class="font-sans bg-pattern-light text-gray-800 dark:text-gray-100 transition-colors duration-300 min-h-screen flex flex-col items-center relative">
+
+    <div class="absolute inset-0 bg-gradient-to-b from-transparent to-orange-50/50 dark:to-slate-900/50 pointer-events-none z-0"></div>
+
+    <nav class="w-full bg-primary/95 dark:bg-slate-900/95 backdrop-blur shadow-lg p-4 flex justify-between items-center sticky top-0 z-40 border-b border-orange-600 dark:border-slate-700">
+        <div class="flex items-center gap-2">
+            <span class="text-2xl drop-shadow-md">🚜</span>
+            <div>
+                <h1 data-translate="app_title" class="text-white font-bold text-lg md:text-xl tracking-wide drop-shadow-sm">कृषि सलाहकार</h1>
+                <p class="text-orange-100 text-xs flex items-center gap-1 font-medium">
+                    <span id="weather-text" data-translate="weather_loading">मौसम अपडेट हो रहा है...</span>
+                </p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button onclick="toggleProfileModal()" class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition border border-white/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </button>
+
+            <button id="lang-btn" onclick="toggleLanguage()" class="bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3 py-2 rounded-full transition border border-white/20 shadow-sm">
+                English
+            </button>
+            
+            <button onclick="toggleTheme()" class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition border border-white/10">
+                <svg id="sun-icon" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                <svg id="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            </button>
+        </div>
+    </nav>
+
+    <main class="w-full max-w-2xl flex-grow p-4 flex flex-col gap-4 z-10 relative">
+
+        <div class="bg-white/90 dark:bg-dark-surface/90 backdrop-blur-sm p-5 rounded-2xl shadow-xl border border-white/50 dark:border-gray-700 flex justify-between items-start transition-all hover:shadow-2xl">
+            <div>
+                <h2 id="dash-greet" class="text-sm font-bold text-primary dark:text-orange-400 uppercase tracking-wider mb-2">
+                    नमस्ते
+                </h2>
+                <div class="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                    <p class="flex items-center gap-2">📍 <span id="dash-location" class="font-medium text-gray-800 dark:text-white">--</span></p>
+                    <p class="flex items-center gap-2">🌱 <span id="dash-crop" class="font-medium text-gray-800 dark:text-white">--</span></p>
+                </div>
+            </div>
+            <div class="text-right">
+                <div id="weather-temp" class="text-3xl font-black text-gray-800 dark:text-white tracking-tighter">--°C</div>
+                <div id="weather-desc" class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 uppercase">--</div>
+            </div>
+        </div>
+
+        <div class="bg-white/95 dark:bg-dark-surface/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-white/50 dark:border-gray-700 flex-grow relative">
+            <div id="chat-window" class="p-4 bg-chat-bg dark:bg-slate-800/50 flex flex-col space-y-4 flex-grow">
+            </div>
+
+            <div id="input-area" class="p-3 bg-gray-50 dark:bg-slate-900 border-t border-gray-200 dark:border-gray-700">
+                <div id="image-preview-container" class="mb-2 hidden relative w-fit mx-auto">
+                    <img id="image-preview" class="h-20 rounded-lg border border-gray-300 shadow-md" alt="Preview">
+                    <button onclick="clearImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-sm hover:bg-red-600 transition">&times;</button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="handleImageSelection()">
+                    <button onclick="document.getElementById('image-upload').click()" class="p-3 rounded-full bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-white hover:bg-orange-100 dark:hover:bg-slate-600 transition shadow-sm">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                    </button>
+
+                    <button id="mic-btn" onclick="toggleVoiceInput()" class="p-3 rounded-full bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-white hover:bg-orange-100 dark:hover:bg-slate-600 transition shadow-sm">
+                        <svg id="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                    </button>
+
+                    <input type="text" id="chat-input" 
+                           data-translate-placeholder="input_placeholder" 
+                           placeholder="एक प्रश्न पूछें..." 
+                           class="flex-grow p-3 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary shadow-inner transition">
+
+                    <button id="send-btn" onclick="handleUserInput()" class="p-3 rounded-full bg-primary hover:bg-secondary text-white shadow-lg transition transform active:scale-95 disabled:opacity-50">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="error-message" class="absolute top-2 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg text-xs shadow-lg hidden z-10 animate-bounce"></div>
+        </div>
+    </main>
+
+    <div id="profile-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-overlay p-4 animate-fade-in">
+        <div class="bg-gray-900/95 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-700 transform transition-all scale-100">
+            <div class="p-5 border-b border-gray-700 bg-gray-800">
+                <h2 data-translate="modal_title" class="text-xl font-bold text-white tracking-wide">फ़ार्म प्रोफ़ाइल संपादित करें</h2>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div>
+                    <label data-translate="lbl_name" class="block text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">नाम</label>
+                    <input type="text" id="p-name" class="w-full bg-gray-800 text-white border border-gray-600 rounded-lg p-3 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition">
+                </div>
+                <div>
+                    <label data-translate="lbl_crop" class="block text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">फसल</label>
+                    <input type="text" id="p-crop" class="w-full bg-gray-800 text-white border border-gray-600 rounded-lg p-3 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition">
+                </div>
+                <div>
+                    <label data-translate="lbl_soil" class="block text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">मिट्टी</label>
+                    <input type="text" id="p-soil" class="w-full bg-gray-800 text-white border border-gray-600 rounded-lg p-3 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label data-translate="lbl_region" class="block text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">क्षेत्र</label>
+                        <input type="text" id="p-region" class="w-full bg-gray-800 text-white border border-gray-600 rounded-lg p-3 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label data-translate="lbl_climate" class="block text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">जलवायु</label>
+                        <input type="text" id="p-climate" class="w-full bg-gray-800 text-white border border-gray-600 rounded-lg p-3 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition">
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-700 flex justify-end gap-3 bg-gray-800">
+                <button onclick="toggleProfileModal()" data-translate="btn_cancel" class="text-gray-400 hover:text-white px-4 py-2 text-sm font-medium transition">रद्द करें</button>
+                <button onclick="saveProfile()" data-translate="btn_save" class="bg-primary hover:bg-secondary text-white px-6 py-2 rounded-lg text-sm font-bold shadow-lg hover:shadow-orange-500/30 transition">प्रोफ़ाइल सहेजें</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        
+        const DICTIONARY = {
+            'hi': {
+                app_title: "कृषि सलाहकार",
+                weather_loading: "अपडेट हो रहा है...",
+                input_placeholder: "अपनी फसल के बारे में पूछें...", 
+                modal_title: "फ़ार्म प्रोफ़ाइल संपादित करें",
+                lbl_name: "आपका नाम (Name)",
+                lbl_crop: "फसल का प्रकार (Crop)",
+                lbl_soil: "मिट्टी का विवरण (Soil)",
+                lbl_region: "क्षेत्र (Region)",
+                lbl_climate: "जलवायु (Climate)",
+                btn_cancel: "रद्द करें",
+                btn_save: "प्रोफ़ाइल सहेजें",
+                greet_guest: "नमस्ते, किसान!",
+                greet_user: "नमस्ते, ",
+                set_loc: "स्थान चुनें",
+                set_crop: "फसल चुनें",
+                btn_lang: "English",
+                listening: "सुन रहा हूँ...",
+                stop_listening: "सुनें",
+                thinking: "सोच रहा है...",
+                welcome: "नमस्ते! मैं आपका कृषि मित्र हूँ । मौसम या फसल के बारे में पूछें।"
+            },
+            'en': {
+                app_title: "Farm Advisor",
+                weather_loading: "Updating...",
+                input_placeholder: "Ask about your crop...",         
+                modal_title: "Edit Farm Profile",
+                lbl_name: "Your Name",
+                lbl_crop: "Crop Type",
+                lbl_soil: "Soil Details",
+                lbl_region: "Region/Location",
+                lbl_climate: "Climate",
+                btn_cancel: "Cancel",
+                btn_save: "Save Profile",
+                greet_guest: "Hello, Farmer!",
+                greet_user: "Hello, ",
+                set_loc: "Set Location",
+                set_crop: "Set Crop",
+                btn_lang: "हिंदी",
+                listening: "Listening...",
+                stop_listening: "Listen",
+                thinking: "thinking...",
+                welcome: "Hello! I am Krishi Mitra . Ask me about weather or crops."
+            }
+        };
+
+        const groqKey = "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"; 
+        
+        const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+        
+        const MODEL_ID = 'meta-llama/llama-4-scout-17b-16e-instruct'; 
+
+        let currentLang = localStorage.getItem('k_lang') || 'hi';
+        let userProfile = JSON.parse(localStorage.getItem('k_profile')) || {};
+        let uploadedImgDataUrl = null;
+        let recognition = null;
+
+        function applyTranslations() {
+            const texts = DICTIONARY[currentLang];
+            
+            document.querySelectorAll('[data-translate]').forEach(el => {
+                const key = el.getAttribute('data-translate');
+                if(texts[key]) el.textContent = texts[key];
+            });
+
+            document.querySelectorAll('[data-translate-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-translate-placeholder');
+                if(texts[key]) el.placeholder = texts[key];
+            });
+
+            document.getElementById('lang-btn').textContent = texts.btn_lang;
+            const greetEl = document.getElementById('dash-greet');
+            if(userProfile.name) {
+                greetEl.textContent = texts.greet_user + userProfile.name + "!";
+            } else {
+                greetEl.textContent = texts.greet_guest;
+            }
+            document.getElementById('dash-location').textContent = userProfile.region || texts.set_loc;
+            document.getElementById('dash-crop').textContent = userProfile.crop || texts.set_crop;
+        }
+
+        window.toggleLanguage = function() {
+            currentLang = currentLang === 'hi' ? 'en' : 'hi';
+            localStorage.setItem('k_lang', currentLang);
+            applyTranslations(); 
+            document.getElementById('chat-window').innerHTML = '';
+            appendMessage(DICTIONARY[currentLang].welcome, false);
+        }
+
+        window.toggleTheme = function() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            document.getElementById('sun-icon').classList.toggle('hidden', !isDark);
+            document.getElementById('moon-icon').classList.toggle('hidden', isDark);
+            localStorage.setItem('k_theme', isDark ? 'dark' : 'light');
+        }
+        if (localStorage.getItem('k_theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.getElementById('sun-icon').classList.remove('hidden');
+            document.getElementById('moon-icon').classList.add('hidden');
+        }
+
+        window.toggleProfileModal = function() {
+            const m = document.getElementById('profile-modal');
+            if(m.classList.contains('hidden')) {
+                ['name','crop','soil','region','climate'].forEach(k => {
+                    document.getElementById('p-'+k).value = userProfile[k] || '';
+                });
+                m.classList.remove('hidden');
+            } else {
+                m.classList.add('hidden');
+            }
+        }
+
+        window.saveProfile = function() {
+            userProfile = {
+                name: document.getElementById('p-name').value,
+                crop: document.getElementById('p-crop').value,
+                soil: document.getElementById('p-soil').value,
+                region: document.getElementById('p-region').value,
+                climate: document.getElementById('p-climate').value,
+            };
+            localStorage.setItem('k_profile', JSON.stringify(userProfile));
+            toggleProfileModal();
+            applyTranslations();
+        }
+
+        function fetchWeather() {
+            if(!navigator.geolocation) return;
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                try {
+                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true`);
+                    const data = await res.json();
+                    if(data.current_weather) {
+                        const t = data.current_weather.temperature;
+                        const c = data.current_weather.weathercode;
+                        document.getElementById('weather-temp').textContent = t + "°C";
+                        
+                        let desc = "Clear";
+                        if(c>3) desc="Cloudy"; if(c>45) desc="Foggy"; if(c>50) desc="Rainy";
+                        
+                        if(currentLang === 'hi') {
+                            const map = { "Clear":"साफ़", "Cloudy":"बादल", "Foggy":"कोहरा", "Rainy":"बारिश" };
+                            desc = map[desc] || desc;
+                        }
+                        document.getElementById('weather-desc').textContent = desc;
+                        document.getElementById('weather-text').textContent = t + "°C " + desc;
+                    }
+                } catch(e) {}
+            });
+        }
+
+        function appendMessage(txt, isUser, raw=null) {
+            const d = document.createElement('div');
+            d.className = `p-3 max-w-[85%] ${isUser ? 'user-message ml-auto' : 'ai-message'} animate-fade-in`;
+            
+            if(!isUser && raw) {
+                const clean = raw.replace(/"/g, "&quot;").replace(/\n/g, ' ');
+                d.innerHTML = `<div>${txt}</div><div class="mt-2 text-right"><button onclick="playTTS(this)" data-text="${clean}" class="text-xs text-primary font-bold flex items-center justify-end w-full gap-1">🔊 ${DICTIONARY[currentLang].stop_listening}</button></div>`;
+            } else {
+                d.innerHTML = txt;
+            }
+            const w = document.getElementById('chat-window');
+            w.appendChild(d);
+            w.scrollTop = w.scrollHeight;
+        }
+
+        window.handleImageSelection = function() {
+            const f = document.getElementById('image-upload').files[0];
+            if(!f) return;
+            const r = new FileReader();
+            r.onload = (e) => {
+                uploadedImgDataUrl = e.target.result;
+                document.getElementById('image-preview').src = e.target.result;
+                document.getElementById('image-preview-container').classList.remove('hidden');
+            };
+            r.readAsDataURL(f);
+        }
+        window.clearImage = function() {
+            uploadedImgDataUrl = null;
+            document.getElementById('image-upload').value = '';
+            document.getElementById('image-preview-container').classList.add('hidden');
+        }
+
+        window.handleUserInput = async function() {
+            const input = document.getElementById('chat-input');
+            const txt = input.value.trim();
+            if(!txt && !uploadedImgDataUrl) return;
+            
+            document.getElementById('send-btn').disabled = true;
+            input.value = '';
+            
+            appendMessage(txt || (currentLang==='hi'?'[फोटो]':'[Photo]'), true);
+            
+            const loader = document.createElement('div');
+            loader.className = 'p-3 ai-message text-gray-500 italic text-sm';
+            loader.textContent = DICTIONARY[currentLang].thinking;
+            document.getElementById('chat-window').appendChild(loader);
+
+            const ctx = userProfile.crop ? `User context: Name ${userProfile.name}, Crop ${userProfile.crop}, Soil ${userProfile.soil}, Region ${userProfile.region}.` : "";
+            const sysPrompt = currentLang === 'hi' 
+                ? `आप एक कृषि सलाहकार 'कृषि मित्र' हैं। ${ctx} हिंदी में उत्तर दें। जवाब छोटा, आसान और सटीक रखें।` 
+                : `You are 'Krishi Mitra', a Farm Advisor. ${ctx} Answer in English. Keep answers concise, simple and helpful.`;
+
+            let userContent = [];
+            if(txt) userContent.push({ type: "text", text: txt });
+            
+            if(uploadedImgDataUrl) {
+                userContent.push({ 
+                    type: "image_url", 
+                    image_url: { url: uploadedImgDataUrl } 
+                });
+            }
+
+            const messages = [
+                { role: "system", content: sysPrompt },
+                { role: "user", content: userContent }
+            ];
+
+            try {
+                if(groqKey.includes("PUT_YOUR")) throw new Error("Groq API Key Missing");
+
+                const res = await fetch(GROQ_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${groqKey}`
+                    },
+                    body: JSON.stringify({
+                        model: MODEL_ID,
+                        messages: messages,
+                        temperature: 0.7,
+                        max_tokens: 1024
+                    })
+                });
+
+                if(!res.ok) {
+                    const errData = await res.json();
+                    console.error("Groq API Error:", errData);
+                    throw new Error(errData.error?.message || "API Error");
+                }
+
+                const data = await res.json();
+                const reply = data.choices[0].message.content;
+                
+                loader.remove();
+                clearImage();
+                const formatted = reply.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+                appendMessage(formatted, false, reply);
+            } catch(e) {
+                console.error(e);
+                loader.textContent = "Error: " + e.message + ". Check Console/API Key.";
+                loader.classList.add("text-red-500");
+            }
+            document.getElementById('send-btn').disabled = false;
+        }
+
+        window.playTTS = function(btn) {
+            const txt = btn.getAttribute('data-text');
+            
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(txt);
+                utterance.lang = currentLang === 'hi' ? 'hi-IN' : 'en-US';
+                
+                const oldText = btn.innerHTML;
+                btn.innerHTML = "🔊 ...";
+                
+                utterance.onend = () => { btn.innerHTML = oldText; };
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("Text-to-speech not supported in this browser.");
+            }
+        }
+
+        window.toggleVoiceInput = function() {
+            if(!('webkitSpeechRecognition' in window)) return alert("Use Chrome");
+            if(recognition) { recognition.stop(); recognition = null; return; }
+            
+            recognition = new webkitSpeechRecognition();
+            recognition.lang = currentLang==='hi'?'hi-IN':'en-US';
+            
+            recognition.onstart = () => {
+                document.getElementById('mic-icon').classList.add('text-red-500','animate-pulse');
+                document.getElementById('chat-input').placeholder = DICTIONARY[currentLang].listening;
+            };
+            recognition.onresult = (e) => {
+                document.getElementById('chat-input').value = e.results[0][0].transcript;
+                window.handleUserInput();
+            };
+            recognition.onend = () => {
+                document.getElementById('mic-icon').classList.remove('text-red-500','animate-pulse');
+                document.getElementById('chat-input').placeholder = DICTIONARY[currentLang].input_placeholder;
+                recognition = null;
+            };
+            recognition.start();
+        }
+
+        applyTranslations();
+        fetchWeather();
+        appendMessage(DICTIONARY[currentLang].welcome, false);
+        
+        if(!userProfile.name) {
+            setTimeout(toggleProfileModal, 500); 
+        } 
+
+    </script>
+</body>
+</html>
