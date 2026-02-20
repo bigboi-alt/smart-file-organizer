@@ -7,83 +7,67 @@ FILE_TYPES = {
     "Images": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"],
     "Videos": [".mp4", ".mkv", ".avi", ".mov"],
     "Documents": [".pdf", ".docx", ".doc", ".txt", ".pptx", ".xlsx"],
-    "Audio": [".mp3", ".wav", ".aac"],
-    "Archives": [".zip", ".rar", ".7z"],
+    "Music": [".mp3", ".wav", ".aac"],
+    "Archives": [".zip", ".rar", ".7z", ".tar"],
+    "Programs": [".exe", ".msi"],
     "Code": [".py", ".js", ".cpp", ".c", ".java", ".html", ".css"]
 }
 
+def find_empty_folders(folder_path):
+    empty_folders = []
 
-def get_unique_path(destination):
-    """
-    Prevents overwriting files by adding _1, _2, etc.
-    """
-    base, ext = os.path.splitext(destination)
-    counter = 1
+    for root, dirs, files in os.walk(folder_path):
+        if root == folder_path:
+            continue
+        if not dirs and not files:
+            empty_folders.append(root)
 
-    while os.path.exists(destination):
-        destination = f"{base}_{counter}{ext}"
-        counter += 1
-
-    return destination
-
+    return empty_folders
 
 def organize_files(folder_path):
-    if not os.path.exists(folder_path):
-        print("❌ Error: Folder does not exist.")
-        return
+    for file in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, file)
 
-    for file_name in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, file_name)
+        if os.path.isfile(file_path):
+            _, ext = os.path.splitext(file)
+            ext = ext.lower()
 
-        # Skip folders
-        if os.path.isdir(file_path):
-            continue
+            moved = False
+            for folder_name, extensions in FILE_TYPES.items():
+                if ext in extensions:
+                    target_folder = os.path.join(folder_path, folder_name)
+                    os.makedirs(target_folder, exist_ok=True)
+                    shutil.move(file_path, os.path.join(target_folder, file))
+                    moved = True
+                    break
 
-        _, ext = os.path.splitext(file_name)
-        ext = ext.lower()
-
-        moved = False
-
-        for category, extensions in FILE_TYPES.items():
-            if ext in extensions:
-                dest_folder = os.path.join(folder_path, category)
-                os.makedirs(dest_folder, exist_ok=True)
-
-                destination = os.path.join(dest_folder, file_name)
-                destination = get_unique_path(destination)
-
-                shutil.move(file_path, destination)
-                moved = True
-                break
-
-        # If file type not matched
-        if not moved:
-            other_folder = os.path.join(folder_path, "Others")
-            os.makedirs(other_folder, exist_ok=True)
-
-            destination = os.path.join(other_folder, file_name)
-            destination = get_unique_path(destination)
-
-            shutil.move(file_path, destination)
-
+            if not moved:
+                other_folder = os.path.join(folder_path, "Others")
+                os.makedirs(other_folder, exist_ok=True)
+                shutil.move(file_path, os.path.join(other_folder, file))
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Smart File Organizer - Organize files by type"
-    )
-
+    parser = argparse.ArgumentParser(description="Smart File Organizer")
     parser.add_argument(
-        "--path",
-        type=str,
-        required=True,
-        help="Path of the folder to organize"
+        "path",
+        nargs="?",
+        default=os.getcwd(),
+        help="Folder path to organize (default: current directory)"
     )
 
     args = parser.parse_args()
 
+    # Find empty folders FIRST
+    empty_folders = find_empty_folders(args.path)
+
+    if empty_folders:
+        print("📂 Empty folders found (listed first):")
+        for folder in empty_folders:
+            print(f" - {folder}")
+        print()  # spacing
+
     organize_files(args.path)
     print("✅ Files organized successfully!")
-
 
 if __name__ == "__main__":
     main()
