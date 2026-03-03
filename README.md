@@ -41,5 +41,4 @@ It helps keep directories like **Downloads** clean by sorting files into categor
 
 ---
 
-## 📁 Project Structure
 
